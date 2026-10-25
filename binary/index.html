@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Binary Switchboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Oswald:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1b1d20;
+    --panel-hi: #5d6168;
+    --panel-lo: #3a3d42;
+    --panel-edge: #26282c;
+    --ink: #e9e6df;
+    --ink-off: #7d8086;
+    --led-on: #ff2a1a;
+    --led-off: #4a0d0a;
+    --readout-bg: #120605;
+    /* one unit of switch size; everything on the panel scales from it */
+    --s: clamp(34px, 9.4vw, 84px);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at 50% 0%, #2b2e33 0%, var(--bg) 70%);
+    color: var(--ink);
+    font-family: "Oswald", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 48px;
+  }
+
+  h1 {
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    font-size: clamp(18px, 4vw, 28px);
+    margin: 0 0 24px;
+    color: #c9c4b8;
+  }
+
+  /* ---------- the metal front panel ---------- */
+  .panel {
+    position: relative;
+    width: 100%;
+    max-width: 960px;
+    padding: calc(var(--s) * 0.5) calc(var(--s) * 0.3) calc(var(--s) * 0.45);
+    border-radius: 14px;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, var(--panel-hi), var(--panel-lo));
+    border: 2px solid var(--panel-edge);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.25),
+      inset 0 -2px 0 rgba(0,0,0,0.35),
+      0 18px 40px rgba(0,0,0,0.6);
+  }
+
+  .screw {
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #d9dbde, #6c7076 60%, #3b3e43);
+    box-shadow: 0 1px 1px rgba(0,0,0,0.6);
+  }
+  .screw::after {
+    content: "";
+    position: absolute;
+    left: 2px; right: 2px; top: 6px; height: 2px;
+    background: #2b2d31;
+    transform: rotate(var(--r, 30deg));
+  }
+  .screw.tl { top: 10px; left: 10px; --r: 20deg; }
+  .screw.tr { top: 10px; right: 10px; --r: 75deg; }
+  .screw.bl { bottom: 10px; left: 10px; --r: -40deg; }
+  .screw.br { bottom: 10px; right: 10px; --r: 110deg; }
+  @media (max-width: 520px) { .screw { width: 10px; height: 10px; } .screw::after { top: 4px; } .screw.tl, .screw.tr { top: 6px; } .screw.bl, .screw.br { bottom: 6px; } .screw.tl, .screw.bl { left: 6px; } .screw.tr, .screw.br { right: 6px; } .panel { padding-top: calc(var(--s) * 0.6); } }
+
+  .bits {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: calc(var(--s) * 0.12);
+  }
+
+  .bit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ---------- bit digit ---------- */
+  .digit {
+    font-family: "Share Tech Mono", ui-monospace, monospace;
+    font-size: calc(var(--s) * 0.38);
+    line-height: 1;
+    color: var(--ink-off);
+    margin-bottom: calc(var(--s) * 0.14);
+    transition: color 0.12s;
+  }
+  .bit.on .digit { color: var(--ink); font-weight: 700; text-shadow: 0 0 1px currentColor; }
+
+  /* ---------- LED ---------- */
+  .led {
+    width: calc(var(--s) * 0.42);
+    height: calc(var(--s) * 0.42);
+    border-radius: 50%;
+    padding: calc(var(--s) * 0.06);
+    background: radial-gradient(circle at 40% 35%, #f2f3f5, #8b8f95 55%, #45484d);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.5);
+    margin-bottom: calc(var(--s) * 0.4);
+  }
+  .led i {
+    display: block;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, #8a2a22 0%, var(--led-off) 55%, #200403 100%);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.7);
+    transition: background 0.12s, box-shadow 0.12s;
+  }
+  .bit.on .led i {
+    background: radial-gradient(circle at 38% 32%, #fff2ee 0%, #ff7a66 18%, var(--led-on) 50%, #a50d05 100%);
+    box-shadow:
+      0 0 calc(var(--s) * 0.18) var(--led-on),
+      0 0 calc(var(--s) * 0.5) rgba(255, 42, 26, 0.55);
+  }
+
+  /* ---------- toggle switch (front view of a panel-mount bat toggle) ---------- */
+  .toggle {
+    position: relative;
+    width: calc(var(--s) * 0.9);
+    height: calc(var(--s) * 1.9);
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .toggle:focus-visible { outline: 2px solid #ffd27a; outline-offset: 4px; border-radius: 8px; }
+  .toggle > span {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* black body with tan phenolic rim */
+  .body {
+    width: calc(var(--s) * 0.86);
+    height: calc(var(--s) * 1.8);
+    border-radius: 3px;
+    border: calc(var(--s) * 0.055) solid #a8703d;
+    background: linear-gradient(160deg, #2e2e2e, #0d0d0d 60%);
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.5),
+      0 0 0 1px #6b4220,
+      0 4px 8px rgba(0,0,0,0.6);
+  }
+
+  /* chrome nameplate */
+  .plate {
+    width: calc(var(--s) * 0.6);
+    height: calc(var(--s) * 1.6);
+    border-radius: calc(var(--s) * 0.06);
+    background: linear-gradient(100deg, #8d9196 0%, #f4f5f6 30%, #b9bdc2 55%, #e6e8ea 75%, #7d8186 100%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.7);
+  }
+  .tag {
+    position: absolute;
+    left: 50%;
+    width: calc(var(--s) * 0.48);
+    height: calc(var(--s) * 0.28);
+    transform: translateX(-50%);
+    border-radius: 2px;
+    display: grid;
+    place-items: center;
+    font: 700 calc(var(--s) * 0.19) / 1 "Oswald", system-ui, sans-serif;
+    color: #fff;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
+  }
+  .tag.on-tag { top: calc(var(--s) * 0.06); background: #d8202a; }
+  .tag.off-tag { bottom: calc(var(--s) * 0.06); background: #1c1c1c; }
+
+  /* washer, hex nut, threaded bushing and bore */
+  .washer {
+    width: calc(var(--s) * 0.66);
+    height: calc(var(--s) * 0.66);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #b4b8bd 45%, #6f7378 80%);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  }
+  .nut {
+    width: calc(var(--s) * 0.58);
+    height: calc(var(--s) * 0.58);
+    clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%);
+    background:
+      linear-gradient(60deg, transparent 49%, rgba(0,0,0,0.18) 50%, transparent 51%),
+      linear-gradient(-60deg, transparent 49%, rgba(255,255,255,0.35) 50%, transparent 51%),
+      linear-gradient(160deg, #fbfbfc, #a3a7ac 50%, #62666b);
+  }
+  .bushing {
+    width: calc(var(--s) * 0.42);
+    height: calc(var(--s) * 0.42);
+    border-radius: 50%;
+    background:
+      repeating-radial-gradient(circle, rgba(0,0,0,0.28) 0 1px, rgba(255,255,255,0.18) 1px 2px, transparent 2px 3px),
+      radial-gradient(circle at 38% 32%, #f2f3f4, #9a9ea3 60%, #55595e);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  }
+  .bore {
+    width: calc(var(--s) * 0.2);
+    height: calc(var(--s) * 0.2);
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #0a0a0a 55%, #44474b);
+  }
+
+  /* short, thick chrome bat lever anchored in the bore; flips via scaleY */
+  .toggle > .lever {
+    top: auto;
+    bottom: 50%;
+    width: calc(var(--s) * 0.24);
+    height: calc(var(--s) * 0.56);
+    transform: translateX(-50%) scaleY(-1);
+    transform-origin: 50% 100%;
+    transition: transform 0.14s cubic-bezier(.5, 0, .3, 1.4);
+    filter: drop-shadow(calc(var(--s) * 0.04) 0 calc(var(--s) * 0.03) rgba(0,0,0,0.55));
+  }
+  .lever::before {
+    /* shaft, slightly wider toward the tip */
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    top: calc(var(--s) * 0.11);
+    clip-path: polygon(6% 0, 94% 0, 74% 100%, 26% 100%);
+    background: linear-gradient(90deg, #5f6368 0%, #d9dcdf 22%, #ffffff 34%, #b3b7bc 58%, #4b4f54 100%);
+  }
+  .lever::after {
+    /* rounded end */
+    content: "";
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle at 36% 32%, #ffffff 0 12%, #c4c8cc 40%, #5d6166 100%);
+  }
+  .bit.on .toggle > .lever { transform: translateX(-50%) scaleY(1); }
+
+  /* ---------- labels ---------- */
+  .pow, .val {
+    margin-top: calc(var(--s) * 0.18);
+    font-family: "Share Tech Mono", ui-monospace, monospace;
+    color: var(--ink-off);
+    font-weight: 400;
+    transition: color 0.12s;
+    white-space: nowrap;
+  }
+  .pow { font-size: calc(var(--s) * 0.3); margin-top: calc(var(--s) * 0.3); }
+  .pow sup { font-size: 0.65em; }
+  .val { font-size: calc(var(--s) * 0.28); margin-top: calc(var(--s) * 0.06); }
+  .bit.on .pow, .bit.on .val {
+    color: var(--ink);
+    font-weight: 700;
+    text-shadow: 0 0 1px currentColor;
+  }
+
+  /* ---------- readout ---------- */
+  .readout {
+    /* bleeds past the grid by --bleed on each side so its inner grid lines up with .bits */
+    --bleed: calc(var(--s) * 0.18);
+    margin: calc(var(--s) * 0.5) calc(var(--bleed) * -1) 0;
+    padding: calc(var(--s) * 0.18) var(--bleed);
+    border-radius: 8px;
+    background: var(--readout-bg);
+    box-shadow: inset 0 3px 10px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.15);
+    font-family: "Share Tech Mono", ui-monospace, monospace;
+    color: var(--led-on);
+    text-shadow: 0 0 8px rgba(255, 42, 26, 0.7);
+  }
+  .addends {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: calc(var(--s) * 0.12);
+    font-size: calc(var(--s) * 0.28);
+    min-height: 1.3em;
+  }
+  .addend {
+    position: relative;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .addend .op {
+    /* sits in the gutter between this column and the next */
+    position: absolute;
+    top: 0;
+    right: calc(var(--s) * -0.06);
+    transform: translateX(50%);
+  }
+  .decimal {
+    font-size: clamp(40px, 9vw, 72px);
+    line-height: 1;
+    text-align: right;
+    margin-top: calc(var(--s) * 0.1);
+  }
+  .bases {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1.6em;
+    margin-top: calc(var(--s) * 0.16);
+    padding-top: calc(var(--s) * 0.12);
+    border-top: 1px solid rgba(255, 42, 26, 0.18);
+    font-size: clamp(15px, 3vw, 26px);
+  }
+  .bases .lbl { font-size: 0.6em; opacity: 0.7; margin-right: 0.5em; letter-spacing: 0.1em; }
+  .decimal .eq { font-size: 0.5em; margin-right: 0.4em; vertical-align: middle; }
+
+  .controls {
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .controls button {
+    font: 600 15px "Oswald", system-ui, sans-serif;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #222;
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: 1px solid #2a2c30;
+    background: linear-gradient(180deg, #eceef0, #a7abb1);
+    box-shadow: 0 3px 0 #4a4d52, 0 5px 10px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+  .controls button:active { transform: translateY(2px); box-shadow: 0 1px 0 #4a4d52; }
+  .controls button:focus-visible { outline: 2px solid #ffd27a; outline-offset: 3px; }
+</style>
+</head>
+<body>
+  <h1>Binary Switchboard</h1>
+
+  <div class="panel">
+    <span class="screw tl"></span><span class="screw tr"></span>
+    <span class="screw bl"></span><span class="screw br"></span>
+
+    <div class="bits" id="bits"></div>
+
+    <div class="readout" aria-live="polite">
+      <div class="addends" id="addends"></div>
+      <div class="decimal" id="decimal">0</div>
+      <div class="bases">
+        <span><span class="lbl">HEX</span><span id="hex">0x00</span></span>
+        <span><span class="lbl">OCT</span><span id="oct">0o000</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button type="button" id="dec">&minus;1</button>
+    <button type="button" id="inc">+1</button>
+    <button type="button" id="clear">Clear</button>
+  </div>
+
+<script>
+  const bitsEl = document.getElementById("bits");
+  const addendsEl = document.getElementById("addends");
+  const decimalEl = document.getElementById("decimal");
+  const hexEl = document.getElementById("hex");
+  const octEl = document.getElementById("oct");
+  let value = 0;
+
+  // Build columns for bit 7 (left) down to bit 0 (right).
+  const columns = [];
+  for (let b = 7; b >= 0; b--) {
+    const col = document.createElement("div");
+    col.className = "bit";
+    col.innerHTML = `
+      <div class="digit">0</div>
+      <div class="led"><i></i></div>
+      <button type="button" class="toggle" aria-pressed="false" aria-label="Bit ${b}, value ${1 << b}">
+        <span class="body"></span>
+        <span class="plate"><span class="tag on-tag">ON</span><span class="tag off-tag">OFF</span></span>
+        <span class="washer"></span>
+        <span class="nut"></span>
+        <span class="bushing"></span>
+        <span class="bore"></span>
+        <span class="lever"></span>
+      </button>
+      <div class="pow">2<sup>${b}</sup></div>
+      <div class="val">${1 << b}</div>`;
+    col.querySelector(".toggle").addEventListener("click", () => setValue(value ^ (1 << b)));
+    bitsEl.appendChild(col);
+    const addend = document.createElement("div");
+    addend.className = "addend";
+    addendsEl.appendChild(addend);
+    columns.push({ b, col, toggle: col.querySelector(".toggle"), addend, digit: col.querySelector(".digit") });
+  }
+
+  function setValue(v) {
+    value = (v + 256) % 256;
+    // every set bit except the lowest is followed by "+"
+    const lowest = value & -value;
+    for (const { b, col, toggle, addend, digit } of columns) {
+      const on = (value >> b) & 1;
+      col.classList.toggle("on", !!on);
+      digit.textContent = on;
+      toggle.setAttribute("aria-pressed", on ? "true" : "false");
+      addend.innerHTML = on ? `${1 << b}${(1 << b) === lowest ? "" : '<span class="op">+</span>'}` : "";
+    }
+    decimalEl.innerHTML = `<span class="eq">=</span>${value}`;
+    hexEl.textContent = "0x" + value.toString(16).toUpperCase().padStart(2, "0");
+    octEl.textContent = "0o" + value.toString(8).padStart(3, "0");
+  }
+
+  document.getElementById("inc").addEventListener("click", () => setValue(value + 1));
+  document.getElementById("dec").addEventListener("click", () => setValue(value - 1));
+  document.getElementById("clear").addEventListener("click", () => setValue(0));
+
+  setValue(0);
+</script>
+</body>
+</html>
