@@ -16,7 +16,6 @@
     --ink: #e9e6df;
     --ink-off: #7d8086;
     --led-on: #ff2a1a;
-    --led-off: #4a0d0a;
     --readout-bg: #120605;
     /* one unit of switch size; everything on the panel scales from it */
     --s: clamp(34px, 9.4vw, 84px);
@@ -94,41 +93,23 @@
     align-items: center;
   }
 
-  /* ---------- bit digit ---------- */
+  /* ---------- 7-segment bit digit ---------- */
   .digit {
-    font-family: "Share Tech Mono", ui-monospace, monospace;
-    font-size: calc(var(--s) * 0.38);
-    line-height: 1;
-    color: var(--ink-off);
-    margin-bottom: calc(var(--s) * 0.14);
-    transition: color 0.12s;
+    width: calc(var(--s) * 0.62);
+    padding: calc(var(--s) * 0.08) calc(var(--s) * 0.09);
+    margin-bottom: calc(var(--s) * 0.35);
+    border-radius: 4px;
+    background: var(--readout-bg);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.18);
   }
-  .bit.on .digit { color: var(--ink); font-weight: 700; text-shadow: 0 0 1px currentColor; }
-
-  /* ---------- LED ---------- */
-  .led {
-    width: calc(var(--s) * 0.42);
-    height: calc(var(--s) * 0.42);
-    border-radius: 50%;
-    padding: calc(var(--s) * 0.06);
-    background: radial-gradient(circle at 40% 35%, #f2f3f5, #8b8f95 55%, #45484d);
-    box-shadow: 0 2px 3px rgba(0,0,0,0.5);
-    margin-bottom: calc(var(--s) * 0.4);
+  .digit svg { display: block; width: 100%; height: auto; transform: skewX(-6deg); }
+  .seg { fill: rgba(255, 42, 26, 0.09); transition: fill 0.1s; }
+  /* "0" lights a b c d e f; "1" lights b c */
+  .seg.b, .seg.c,
+  .bit:not(.on) .seg.a, .bit:not(.on) .seg.d, .bit:not(.on) .seg.e, .bit:not(.on) .seg.f {
+    fill: var(--led-on);
   }
-  .led i {
-    display: block;
-    width: 100%; height: 100%;
-    border-radius: 50%;
-    background: radial-gradient(circle at 38% 32%, #8a2a22 0%, var(--led-off) 55%, #200403 100%);
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.7);
-    transition: background 0.12s, box-shadow 0.12s;
-  }
-  .bit.on .led i {
-    background: radial-gradient(circle at 38% 32%, #fff2ee 0%, #ff7a66 18%, var(--led-on) 50%, #a50d05 100%);
-    box-shadow:
-      0 0 calc(var(--s) * 0.18) var(--led-on),
-      0 0 calc(var(--s) * 0.5) rgba(255, 42, 26, 0.55);
-  }
+  .digit svg { filter: drop-shadow(0 0 calc(var(--s) * 0.04) rgba(255, 42, 26, 0.8)); }
 
   /* ---------- toggle switch (front view of a panel-mount bat toggle) ---------- */
   .toggle {
@@ -236,7 +217,7 @@
     left: 0; right: 0; bottom: 0;
     top: calc(var(--s) * 0.11);
     clip-path: polygon(6% 0, 94% 0, 74% 100%, 26% 100%);
-    background: linear-gradient(90deg, #5f6368 0%, #d9dcdf 22%, #ffffff 34%, #b3b7bc 58%, #4b4f54 100%);
+    background: linear-gradient(90deg, #26282b 0%, #6a6e73 22%, #9a9ea3 34%, #55595e 58%, #1e2023 100%);
   }
   .lever::after {
     /* rounded end */
@@ -246,7 +227,7 @@
     width: 100%;
     aspect-ratio: 1;
     border-radius: 50%;
-    background: radial-gradient(circle at 36% 32%, #ffffff 0 12%, #c4c8cc 40%, #5d6166 100%);
+    background: radial-gradient(circle at 36% 32%, #b4b8bd 0 10%, #63676c 40%, #222427 100%);
   }
   .bit.on .toggle > .lever { transform: translateX(-50%) scaleY(1); }
 
@@ -308,14 +289,17 @@
   }
   .bases {
     display: flex;
-    justify-content: flex-end;
-    gap: 1.6em;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.4em 1.6em;
     margin-top: calc(var(--s) * 0.16);
     padding-top: calc(var(--s) * 0.12);
     border-top: 1px solid rgba(255, 42, 26, 0.18);
     font-size: clamp(15px, 3vw, 26px);
   }
   .bases .lbl { font-size: 0.6em; opacity: 0.7; margin-right: 0.5em; letter-spacing: 0.1em; }
+  .bases .desc { font-size: 0.6em; opacity: 0.75; margin-left: 0.6em; }
   .decimal .eq { font-size: 0.5em; margin-right: 0.4em; vertical-align: middle; }
 
   .controls {
@@ -354,8 +338,9 @@
       <div class="addends" id="addends"></div>
       <div class="decimal" id="decimal">0</div>
       <div class="bases">
+        <span><span class="lbl">ASCII</span><span id="ascii"></span><span class="desc" id="ascii-desc"></span></span>
         <span><span class="lbl">HEX</span><span id="hex">0x00</span></span>
-        <span><span class="lbl">OCT</span><span id="oct">0o000</span></span>
+
       </div>
     </div>
   </div>
@@ -371,8 +356,37 @@
   const addendsEl = document.getElementById("addends");
   const decimalEl = document.getElementById("decimal");
   const hexEl = document.getElementById("hex");
-  const octEl = document.getElementById("oct");
+  const asciiEl = document.getElementById("ascii");
+  const asciiDescEl = document.getElementById("ascii-desc");
+
+  // Names for the non-printable ASCII codes 0-31 and 127.
+  const CONTROL = [
+    ["NUL", "Null"], ["SOH", "Start of Heading"], ["STX", "Start of Text"], ["ETX", "End of Text"],
+    ["EOT", "End of Transmission"], ["ENQ", "Enquiry"], ["ACK", "Acknowledge"], ["BEL", "Bell"],
+    ["BS", "Backspace"], ["HT", "Horizontal Tab"], ["LF", "Line Feed"], ["VT", "Vertical Tab"],
+    ["FF", "Form Feed"], ["CR", "Carriage Return"], ["SO", "Shift Out"], ["SI", "Shift In"],
+    ["DLE", "Data Link Escape"], ["DC1", "Device Control 1 (XON)"], ["DC2", "Device Control 2"], ["DC3", "Device Control 3 (XOFF)"],
+    ["DC4", "Device Control 4"], ["NAK", "Negative Acknowledge"], ["SYN", "Synchronous Idle"], ["ETB", "End of Transmission Block"],
+    ["CAN", "Cancel"], ["EM", "End of Medium"], ["SUB", "Substitute"], ["ESC", "Escape"],
+    ["FS", "File Separator"], ["GS", "Group Separator"], ["RS", "Record Separator"], ["US", "Unit Separator"],
+  ];
+
+  function ascii(v) {
+    if (v < 32) return [CONTROL[v][0], CONTROL[v][1]];
+    if (v === 32) return ["SP", "Space"];
+    if (v === 127) return ["DEL", "Delete"];
+    if (v > 127) return ["\u2014", "not ASCII (7-bit, 0\u2013127)"];
+    return [`'${String.fromCharCode(v)}'`, ""];
+  }
   let value = 0;
+
+  // Seven-segment digit: horizontal segments a/g/d, vertical f/b (upper) and e/c (lower).
+  const hSeg = (cls, y) => `<polygon class="seg ${cls}" points="15,${y - 5} 45,${y - 5} 50,${y} 45,${y + 5} 15,${y + 5} 10,${y}"/>`;
+  const vSeg = (cls, x, y1, y2) => `<polygon class="seg ${cls}" points="${x},${y1} ${x + 5},${y1 + 5} ${x + 5},${y2 - 5} ${x},${y2} ${x - 5},${y2 - 5} ${x - 5},${y1 + 5}"/>`;
+  const sevenSeg = `<svg viewBox="0 0 60 100" aria-hidden="true">
+    ${hSeg("a", 8)}${hSeg("g", 50)}${hSeg("d", 92)}
+    ${vSeg("f", 8, 10, 48)}${vSeg("b", 52, 10, 48)}${vSeg("e", 8, 52, 90)}${vSeg("c", 52, 52, 90)}
+  </svg>`;
 
   // Build columns for bit 7 (left) down to bit 0 (right).
   const columns = [];
@@ -380,8 +394,7 @@
     const col = document.createElement("div");
     col.className = "bit";
     col.innerHTML = `
-      <div class="digit">0</div>
-      <div class="led"><i></i></div>
+      <div class="digit">${sevenSeg}</div>
       <button type="button" class="toggle" aria-pressed="false" aria-label="Bit ${b}, value ${1 << b}">
         <span class="body"></span>
         <span class="plate"><span class="tag on-tag">ON</span><span class="tag off-tag">OFF</span></span>
@@ -398,23 +411,22 @@
     const addend = document.createElement("div");
     addend.className = "addend";
     addendsEl.appendChild(addend);
-    columns.push({ b, col, toggle: col.querySelector(".toggle"), addend, digit: col.querySelector(".digit") });
+    columns.push({ b, col, toggle: col.querySelector(".toggle"), addend });
   }
 
   function setValue(v) {
     value = (v + 256) % 256;
     // every set bit except the lowest is followed by "+"
     const lowest = value & -value;
-    for (const { b, col, toggle, addend, digit } of columns) {
+    for (const { b, col, toggle, addend } of columns) {
       const on = (value >> b) & 1;
       col.classList.toggle("on", !!on);
-      digit.textContent = on;
       toggle.setAttribute("aria-pressed", on ? "true" : "false");
       addend.innerHTML = on ? `${1 << b}${(1 << b) === lowest ? "" : '<span class="op">+</span>'}` : "";
     }
     decimalEl.innerHTML = `<span class="eq">=</span>${value}`;
     hexEl.textContent = "0x" + value.toString(16).toUpperCase().padStart(2, "0");
-    octEl.textContent = "0o" + value.toString(8).padStart(3, "0");
+    [asciiEl.textContent, asciiDescEl.textContent] = ascii(value);
   }
 
   document.getElementById("inc").addEventListener("click", () => setValue(value + 1));
